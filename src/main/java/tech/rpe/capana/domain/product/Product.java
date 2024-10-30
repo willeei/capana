@@ -1,10 +1,11 @@
 package tech.rpe.capana.domain.product;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import tech.rpe.capana.domain.AggregateRoot;
-import tech.rpe.capana.domain.commercialorigin.CommercialOriginID;
 import tech.rpe.capana.domain.exceptions.NotificationException;
 import tech.rpe.capana.domain.utils.InstantUtils;
 import tech.rpe.capana.domain.validation.ValidationHandler;
@@ -17,7 +18,7 @@ public class Product extends AggregateRoot<ProductID> {
     private String image;
     private ProductType type;
     private String description;
-    private Set<CommercialOriginID> commercialOrigins;
+    private Set<String> commercialOrigins;
     private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
@@ -30,7 +31,7 @@ public class Product extends AggregateRoot<ProductID> {
             final String image,
             final ProductType type,
             final String description,
-            final Set<CommercialOriginID> commercialOrigins,
+            final Set<String> commercialOrigins,
             final boolean active,
             final Instant createdAt,
             final Instant updatedAt,
@@ -52,19 +53,28 @@ public class Product extends AggregateRoot<ProductID> {
     }
 
     public static Product newProduct(
-            final ProductID id,
             final String title,
             final long externalCode,
             final String image,
             final ProductType type,
             final String description,
-            final Set<CommercialOriginID> commercialOrigins,
             final boolean active
     ) {
         final var now = InstantUtils.now();
         final var deletedAt = active ? null : now;
         return new Product(
-                id, title, externalCode, image, type, description, commercialOrigins, active, now, now, deletedAt);
+                null,
+                title,
+                externalCode,
+                image,
+                type,
+                description,
+                new HashSet<>(),
+                active,
+                now,
+                now,
+                deletedAt
+        );
     }
 
     public static Product with(
@@ -74,7 +84,7 @@ public class Product extends AggregateRoot<ProductID> {
             final String image,
             final ProductType type,
             final String description,
-            final Set<CommercialOriginID> commercialOrigins,
+            final Set<String> commercialOrigins,
             final boolean active,
             final Instant createdAt,
             final Instant updatedAt,
@@ -102,20 +112,25 @@ public class Product extends AggregateRoot<ProductID> {
                 aProduct.getImage(),
                 aProduct.getType(),
                 aProduct.getDescription(),
-                aProduct.getCommercialOrigins(),
+                new HashSet<>(aProduct.getCommercialOrigins()),
                 aProduct.isActive(),
                 aProduct.getCreatedAt(),
                 aProduct.getUpdatedAt(),
                 aProduct.getDeletedAt());
     }
 
-    public void update(
+    @Override
+    public void validate(final ValidationHandler handler) {
+        new ProductValidator(this, handler).validate();
+    }
+
+    public Product update(
             final String title,
             final long externalCode,
             final String image,
             final ProductType type,
             final String description,
-            final Set<CommercialOriginID> commercialOrigins,
+            final Set<String> commercialOrigins,
             final boolean isActive
     ) {
 
@@ -129,12 +144,13 @@ public class Product extends AggregateRoot<ProductID> {
         this.image = image;
         this.type = type;
         this.description = description;
-        this.commercialOrigins = commercialOrigins;
+        this.commercialOrigins = new HashSet<>(commercialOrigins != null ? commercialOrigins : Collections.emptySet());
         this.active = isActive;
         this.updatedAt = Instant.now();
         this.deletedAt = active ? null : this.deletedAt;
-
         selfValidate();
+
+        return this;
     }
 
     public void deactivate() {
@@ -149,11 +165,6 @@ public class Product extends AggregateRoot<ProductID> {
         this.deletedAt = null;
         this.active = true;
         this.updatedAt = InstantUtils.now();
-    }
-
-    @Override
-    public void validate(final ValidationHandler handler) {
-        new ProductValidator(this, handler).validate();
     }
 
     public String getTitle() {
@@ -176,8 +187,8 @@ public class Product extends AggregateRoot<ProductID> {
         return description;
     }
 
-    public Set<CommercialOriginID> getCommercialOrigins() {
-        return commercialOrigins;
+    public Set<String> getCommercialOrigins() {
+        return Collections.unmodifiableSet(commercialOrigins);
     }
 
     public boolean isActive() {
@@ -194,6 +205,33 @@ public class Product extends AggregateRoot<ProductID> {
 
     public Instant getDeletedAt() {
         return deletedAt;
+    }
+
+    public Product addCommercialOrigin(final String commercialOrigin) {
+        if (commercialOrigin == null || commercialOrigin.isBlank()) {
+            return this;
+        }
+        this.commercialOrigins.add(commercialOrigin);
+        this.updatedAt = InstantUtils.now();
+        return this;
+    }
+
+    public Product addCommercialOrigins(final Set<String> commercialOrigins) {
+        if (commercialOrigins == null || commercialOrigins.isEmpty()) {
+            return this;
+        }
+        this.commercialOrigins.addAll(commercialOrigins);
+        this.updatedAt = InstantUtils.now();
+        return this;
+    }
+
+    public Product removeCommercialOrigin(final String commercialOrigin) {
+        if (commercialOrigin == null || commercialOrigin.isBlank()) {
+            return this;
+        }
+        this.commercialOrigins.remove(commercialOrigin);
+        this.updatedAt = InstantUtils.now();
+        return this;
     }
 
     private void selfValidate() {
